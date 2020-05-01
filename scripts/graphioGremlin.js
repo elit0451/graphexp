@@ -133,9 +133,11 @@ var graphioGremlin = (function(){
 		gremlin_query_nodes += ".toList();";
 		
 		let gremlin_query_edges = "edges = " + traversal_source + ".V(nodes).aggregate('node').outE().as('edge').inV().where(within('node')).select('edge').toList();";
-        let gremlin_query_edges_no_vars = "edges = " + traversal_source + ".V()"+has_str+".aggregate('node').outE().as('edge').inV().where(within('node')).select('edge').toList();";
+		//for displaying custom edge propereties
+		var edges_properties = "edgesProperties = " + traversal_source + ".V(nodes).aggregate('node').outE().as('edge').inV().where(within('node')).select('edge').valueMap().with(WithOptions.tokens);";
+		let gremlin_query_edges_no_vars = "edges = " + traversal_source + ".V()"+has_str+".aggregate('node').outE().as('edge').inV().where(within('node')).select('edge').toList();";
         //let gremlin_query_edges_no_vars = "edges = " + traversal_source + ".V()"+has_str+".bothE();";
-		let gremlin_query = gremlin_query_nodes + gremlin_query_edges + "[nodes,edges]";
+		var gremlin_query = gremlin_query_nodes+'\n'+gremlin_query_edges+'\n'+edges_properties+'\n'+'[nodes.toList(),edges.toList(),edgesProperties.toList()]'
 		console.log(gremlin_query);
 
 		// while busy, show we're doing something in the messageArea.
@@ -192,7 +194,8 @@ var graphioGremlin = (function(){
 		console.log('Query for the node and its neigbhors')
 		console.log(gremlin_query_nodes)
 		var gremlin_query_edges = "edges = " + traversal_source + ".V("+id+").bothE("+(edge_filter?"'"+edge_filter+"'":"")+")";
-		var gremlin_query = gremlin_query_nodes+'\n'+gremlin_query_edges+'\n'+'[nodes.toList(),edges.toList()]'
+		var edges_properties = "edgesProperties = " + traversal_source + ".V("+id+").bothE("+(edge_filter?"'"+edge_filter+"'":"")+").valueMap().with(WithOptions.tokens)";
+		var gremlin_query = gremlin_query_nodes+'\n'+gremlin_query_edges+'\n'+edges_properties+'\n'+'[nodes.toList(),edges.toList(),edgesProperties.toList()]'
 		// while busy, show we're doing something in the messageArea.
 		$('#messageArea').html('<h3>(loading)</h3>');
 		var message = "<p>Query ID: "+ d.id +"</p>"
@@ -475,10 +478,10 @@ var graphioGremlin = (function(){
 	function arrange_datav3(data) {
 		// Extract node and edges from the data returned for 'search' and 'click' request
 		// Create the graph object
-		var nodes=[], links=[];
+		var nodes=[], links=[], linksProp=data[2];
 		if(data!=null) {
 			for (var key in data){
-				if(data[key]!=null) {
+				if(data[key]!=null && key != 2) {
 					data[key].forEach(function (item) {
 						if (!("inV" in item) && idIndex(nodes,item.id) == null){ // if vertex and not already in the list
 							item.type = "vertex";
@@ -486,7 +489,7 @@ var graphioGremlin = (function(){
 						}
 						if (("inV" in item) && idIndex(links,item.id) == null){
 							item.type = "edge";
-							links.push(extract_infov3(item));
+							links.push(extract_infov3(item, linksProp));
 						}
 					});
 				}
@@ -511,13 +514,22 @@ var graphioGremlin = (function(){
 		return data_dic
 	}
 
-    function extract_infov3(data) {
+    function extract_infov3(data,linksProp) {
         var isGraphSON3_4 = ($('#communication_method').val() == "GraphSON3_4");
         var data_dic = { id: data.id, label: data.label, type: data.type, properties: {} };
         var prop_dic = {};
         // VERSION 3.4
         if (isGraphSON3_4) {
-           
+			for(var key in linksProp) {
+				if(linksProp[key].id == data.id) {
+ 
+				 for(var prop in linksProp[key]) {
+					 if(prop != 'id' && prop != 'label')
+					 	prop_dic[prop] = linksProp[key][prop]
+				 	}
+				}
+			}
+			
             for (var key in data) {
                 if (data.hasOwnProperty(key) && key != 'id' && key != 'label' && key != 'type') prop_dic[key] = data[key];
             }
